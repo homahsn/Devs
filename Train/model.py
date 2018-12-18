@@ -3,6 +3,7 @@ from collections import deque
 import random
 from formulas import *
 
+
 class Train:
 
     def __init__(self, id, max_a, dep_time):
@@ -12,6 +13,7 @@ class Train:
 
         self.v = 0
         self.x_remaining = 0
+
 
 class Generator(AtomicDEVS):
 
@@ -107,7 +109,6 @@ class RailwaySegment(AtomicDEVS):
         self.train = None
         self.v_max = v_max
 
-
     def intTransition(self):
 
         if self.state == "Idle":
@@ -116,9 +117,10 @@ class RailwaySegment(AtomicDEVS):
             self.state = "Accelerate"
         elif self.state == "Accelerate":
             self.state = "NextSegLight"
+        elif self.state == "Accelerate":
+            self.state = "Idle"
 
         return self.state
-
 
     def extTransition(self, inputs):
 
@@ -127,15 +129,23 @@ class RailwaySegment(AtomicDEVS):
 
         if self.state == "Idle" and train_input is not None:
             self.train = train_input
-            return "TrainIn"
-        elif  query_receive_ack == "Red" and self.state == "Accelerate":
+            self.state = "TrainIn"
+        elif query_receive_ack == "Red" and self.state == "Accelerate":
             brake = brake_formula(self.train.v, 1, self.train.x_remaining)
             self.train.v = brake[0]
             self.train.x_remaining -= brake[1]
-            return "NextSegLight"
+            self.state = "NextSegLight"
+        elif query_receive_ack == "Green" and self.state == "NextSegLight":
+            self.state = "Accelerate"
 
+        return self.state
 
+    '''
     def timeAdvance(self):
+            
+        #TODO
+            
+    '''
 
     def outputFnc(self):
         if self.train is None and self.state == "Idle":
