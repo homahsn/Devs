@@ -153,9 +153,9 @@ class RailwaySegment(AtomicDEVS):
 
     def outputFnc(self):
         if self.train is not None and self.state != "Idle":
-            return "Red"
+            return {self.query_sack: "Red"}
         else:
-            return "Green"
+            return {self.train_out: self.train}
 
 
 class Collector(AtomicDEVS):
@@ -172,7 +172,7 @@ class Collector(AtomicDEVS):
 
     def intTransition(self):
         if self.state == "Empty":
-           self.state = "TrainIn"
+            self.state = "TrainIn"
         elif self.state == "TrainIn":
             self.state = "Empty"
 
@@ -181,11 +181,14 @@ class Collector(AtomicDEVS):
     def extTransition(self, inputs):
         self.time_advance += self.elapsed
         train_input = inputs[self.train_in]
+        query_input = inputs[self.query_recv]
         # query_input = inputs[self.query_recv]
 
         if train_input is not None and isinstance(train_input, Train):
             self.state = "TrainIn"
             self.trains.append(train_input)
+        elif query_input is not None:
+            self.state = "TrainIn"
         else:
             self.state = self.state
 
@@ -193,7 +196,7 @@ class Collector(AtomicDEVS):
 
     def timeAdvance(self):
 
-        if self.state == "Wait":
+        if self.state == "Empty":
             return float('inf')
         elif self.state == "TrainIn":
             return 0
@@ -201,17 +204,21 @@ class Collector(AtomicDEVS):
     def outputFnc(self):
         return {self.query_sack: "Green"}
 
+
 class TrainNetwork(CoupledDEVS):
 
     def __init__(self, name, num_of_trains, v_max, num_of_tracks, length, acceleration, iat):
         CoupledDEVS.__init__(self, name)
 
-        self.generator = self.addSubModel(Generator("Generator", num_of_trains, iat, acceleration))
+        self.generator = Generator("Generator", num_of_trains, iat, acceleration)
+        self.addSubModel(self.generator)
         self.segments = []
         for i in range(num_of_tracks):
-            self.segments.append(self.addSubModel(RailwaySegment("Railway", v_max, length)))
+            segment_length = length / num_of_tracks
+            self.segments.append(self.addSubModel(RailwaySegment("Railway", v_max, segment_length)))
 
-        self.collector = self.addSubModel(Collector("Collector"))
+        self.collector = Collector("Collector")
+        self.addSubModel(self.collector)
 
         self.connectPorts(self.generator.query_send, self.segments[0].query_recv)
         self.connectPorts(self.segments[0].query_sack, self.generator.query_rack)
@@ -225,3 +232,12 @@ class TrainNetwork(CoupledDEVS):
         self.connectPorts(self.segments[-1].query_send, self.collector.query_recv)
         self.connectPorts(self.collector.query_sack, self.segments[-1].query_rack)
         self.connectPorts(self.segments[-1].train_out, self.collector.train_in)
+
+    def select(self, imm_children):
+        if self.generator in imm_children:
+            if imm_children[0] != self.generator:
+                return imm_children[0]
+            else:
+                return imm_children[1]
+        else:
+            return imm_children[0]

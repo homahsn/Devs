@@ -4,7 +4,7 @@ from model import TrainNetwork
 
 
 def terminate_whenStateIsReached(clock, model):
-    return len(model.TrainNetwork.Collector.trains) == len(model.TrainNetwork.Generator.trains)
+    return len(model.collector.trains) == len(model.generator.trains)
 
 
 total_railway_length = 15000
