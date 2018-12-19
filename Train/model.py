@@ -186,3 +186,20 @@ class Collector(AtomicDEVS):
     def intTransition(self):
 #TODO
 '''
+
+
+class TrainNetwork(CoupledDEVS):
+
+    def __init__(self, name, num_of_tracks, length, acceleration, num_of_trains, iat, v_max):
+        CoupledDEVS.__init__(self, name)
+
+        self.generator = self.addSubModel(Generator("Generator", num_of_trains, iat, acceleration))
+        self.segments = []
+        for i in range(num_of_tracks):
+            self.segments.append(self.addSubModel(RailwaySegment("Railway", v_max, length)))
+
+        # self.addSubModel(Collector)
+
+        self.connectPorts(self.generator.query_send, self.segments[0].query_recv)
+        self.connectPorts(self.generator.query_rack, self.segments[0].query_sack)
+        self.connectPorts(self.generator.train_out, self.segments[0].train_in)
