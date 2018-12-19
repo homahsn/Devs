@@ -140,18 +140,23 @@ class RailwaySegment(AtomicDEVS):
 
         return self.state
 
-    '''
     def timeAdvance(self):
-            
-        #TODO
-            
-    '''
+
+        if self.state == "Idle":
+            return float('inf')
+        elif self.state == "Accelerate":
+            velocity_time = acceleration_formula(self.train.v, 100, self.train.x_remaining, self.train.max_a)
+            self.train.v = velocity_time[0]
+            return velocity_time[1]
+        elif self.state == "NextSegLight":
+            return 1
 
     def outputFnc(self):
-        if self.train is None and self.state == "Idle":
+        if self.train is not None and self.state != "Idle":
             return "Red"
         else:
             return "Green"
+
 
 class CollectorState(object):
     def __init__(self):
@@ -160,12 +165,16 @@ class CollectorState(object):
     def set(self, value="green"):
         self.__colour = value
 
+
 class Collector(AtomicDEVS):
     def __init__(self, train, transit_time, iat={}):
         AtomicDEVS.__init__(self)
-        self.query_rack = self.addInPort ("Q_rack")
-        self.query_send = self.addOutPort ("Q_send")
-        self.train_in = self.addOutPort ("train_in")
+        self.query_rack = self.addInPort("Q_rack")
+        self.query_send = self.addOutPort("Q_send")
+        self.train_in = self.addOutPort("train_in")
+
+        transit_time = 0
+
         for i in range(train):
             self.query_train_in = "train_in"
             transit_time == dep_time + iat
