@@ -176,22 +176,29 @@ class Collector(AtomicDEVS):
     def intTransition(self):
 
         if self.state == "Q_rack"
-           self.state = "TrainIn"
+            self.state = "TrainIn"
         else:
             self.state = "Wait"
 
-    def timeAdvance(self): #TODO
 
     def extTransition(self, inputs):
         train_input = inputs[self.train_in]
         for i in range (train_input):
             transit_time = 0
-            if self.train_in == "train_in":
+            if self.train_in == "TrainIn":
                 transit_time = dep_time + iat
             return transit_time
 
+    def timeAdvance(self):
+
+        if self.state == "Wait"
+            return float ('inf')
+        elif self.state == "TrainIn"
+             time = velocity_time + transit_time
+            return time
+
     def outputFnc(self):
-        if self.state =  
+        return self.state == "train_out"
 
 class TrainNetwork(CoupledDEVS):
 
