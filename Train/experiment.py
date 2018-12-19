@@ -17,5 +17,5 @@ trainNetwork = TrainNetwork("TrainNetwork", num_of_trains, max_velocity, num_of_
                             total_railway_length, acceleration, iat)
 sim = Simulator(trainNetwork)
 sim.setTerminationCondition(terminate_whenStateIsReached)
-sim.classicDEVS()
+sim.setClassicDEVS()
 sim.simulate()

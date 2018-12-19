@@ -160,16 +160,17 @@ class RailwaySegment(AtomicDEVS):
 
 class Collector(AtomicDEVS):
     def __init__(self, name):
-        AtomicDEVS.__init__(self)
+        AtomicDEVS.__init__(self, name)
         self.trains = []
-        self.query_recv = self.addInPort ("Q_recv")
-        self.query_sack = self.addOutPort ("Q_sack")
-        self.train_in = self.addInPort ("train_in")
+        self.query_recv = self.addInPort("Q_recv")
+        self.query_sack = self.addOutPort("Q_sack")
+        self.train_in = self.addInPort("train_in")
+
+        self.time_advance = 0
 
         self.state = "Empty"
 
     def intTransition(self):
-
         if self.state == "Empty":
            self.state = "TrainIn"
         elif self.state == "TrainIn":
@@ -178,6 +179,7 @@ class Collector(AtomicDEVS):
         return self.state
 
     def extTransition(self, inputs):
+        self.time_advance += self.elapsed
         train_input = inputs[self.train_in]
         # query_input = inputs[self.query_recv]
 
@@ -196,8 +198,8 @@ class Collector(AtomicDEVS):
         elif self.state == "TrainIn":
             return 0
 
-    def outputFnc(self):
-        return self.state == "train_out"
+    # def outputFnc(self):
+    #     if self.state == "Wait":
 
 
 class TrainNetwork(CoupledDEVS):
