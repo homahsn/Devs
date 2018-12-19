@@ -165,28 +165,33 @@ class CollectorState(object):
     def set(self, value="green"):
         self.__colour = value
 
-
 class Collector(AtomicDEVS):
-    def __init__(self, train, transit_time, iat={}):
+    def __init__(self, train_input, iat=()):
         AtomicDEVS.__init__(self)
-        self.query_rack = self.addInPort("Q_rack")
-        self.query_send = self.addOutPort("Q_send")
-        self.train_in = self.addOutPort("train_in")
+        self.query_rack = self.addInPort ("Q_rack")
+        self.query_send = self.addOutPort ("Q_send")
+        self.train_in = self.addInPort ("train_in")
+        self.train_out = self.addOutPort ("train_out")
 
-        transit_time = 0
-
-        for i in range(train):
-            self.query_train_in = "train_in"
-            transit_time == dep_time + iat
-            return transit_time
-    '''
-         #TODO
-     '''
-'''
     def intTransition(self):
-#TODO
-'''
 
+        if self.state == "Q_rack"
+           self.state = "TrainIn"
+        else:
+            self.state = "Wait"
+
+    def timeAdvance(self): #TODO
+
+    def extTransition(self, inputs):
+        train_input = inputs[self.train_in]
+        for i in range (train_input):
+            transit_time = 0
+            if self.train_in == "train_in":
+                transit_time = dep_time + iat
+            return transit_time
+
+    def outputFnc(self):
+        if self.state =  
 
 class TrainNetwork(CoupledDEVS):
 
