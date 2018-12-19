@@ -158,12 +158,7 @@ class RailwaySegment(AtomicDEVS):
             return "Green"
 
 
-class CollectorState(object):
-    def __init__(self):
-         self.trains = []
 
-    def set(self, value="green"):
-        self.__colour = value
 
 class Collector(AtomicDEVS):
     def __init__(self, train_input, iat=()):
