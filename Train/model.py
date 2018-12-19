@@ -24,7 +24,7 @@ class Generator(AtomicDEVS):
         self.trains = deque([])
 
         for i in range(number_of_trains):
-            max_a = random.randint(0, acceleration)
+            max_a = random.randint(1, acceleration)
             i_a_t = random.randint(1, iat)
             if len(self.trains) == 0:
                 dep_time = 0
@@ -198,9 +198,8 @@ class Collector(AtomicDEVS):
         elif self.state == "TrainIn":
             return 0
 
-    # def outputFnc(self):
-    #     if self.state == "Wait":
-
+    def outputFnc(self):
+        return {self.query_sack: "Green"}
 
 class TrainNetwork(CoupledDEVS):
 
