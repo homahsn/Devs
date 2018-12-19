@@ -7,9 +7,9 @@ from formulas import *
 class Train:
 
     def __init__(self, id, max_a, dep_time):
-        self.__id = id
-        self.__max_a = max_a
-        self.__dep_time = dep_time
+        self.id = id
+        self.max_a = max_a
+        self.dep_time = dep_time
 
         self.v = 0
         self.x_remaining = 0
@@ -17,19 +17,19 @@ class Train:
 
 class Generator(AtomicDEVS):
 
-    def __init__(self, name, number_of_trains, iat=(), max_a=()):
+    def __init__(self, name, number_of_trains, iat, acceleration):
 
         AtomicDEVS.__init__(self, name)
 
         self.trains = deque([])
 
         for i in range(number_of_trains):
-            max_a = random.randint(max_a[0], max_a[1])
-            iat = random.randint(iat[0], iat[1])
+            max_a = random.randint(0, acceleration)
+            i_a_t = random.randint(1, iat)
             if len(self.trains) == 0:
                 dep_time = 0
             else:
-                dep_time = self.trains[-1].dep_time + iat
+                dep_time = self.trains[-1].dep_time + i_a_t
             self.trains.append(Train(i, max_a, dep_time))
 
         self.query_send = self.addOutPort("Q_send")
@@ -159,7 +159,7 @@ class RailwaySegment(AtomicDEVS):
 
 
 class Collector(AtomicDEVS):
-    def __init__(self, train_input, iat=()):
+    def __init__(self, name):
         AtomicDEVS.__init__(self)
         self.trains = []
         self.query_recv = self.addInPort ("Q_recv")
@@ -167,7 +167,6 @@ class Collector(AtomicDEVS):
         self.train_in = self.addInPort ("train_in")
 
         self.state = "Empty"
-
 
     def intTransition(self):
 
@@ -177,8 +176,6 @@ class Collector(AtomicDEVS):
             self.state = "Empty"
 
         return self.state
-
-
 
     def extTransition(self, inputs):
         train_input = inputs[self.train_in]
@@ -191,9 +188,6 @@ class Collector(AtomicDEVS):
             self.state = self.state
 
         return self.state
-
-
-
 
     def timeAdvance(self):
 
@@ -208,7 +202,7 @@ class Collector(AtomicDEVS):
 
 class TrainNetwork(CoupledDEVS):
 
-    def __init__(self, name, num_of_tracks, length, acceleration, num_of_trains, iat, v_max):
+    def __init__(self, name, num_of_trains, v_max, num_of_tracks, length, acceleration, iat):
         CoupledDEVS.__init__(self, name)
 
         self.generator = self.addSubModel(Generator("Generator", num_of_trains, iat, acceleration))
@@ -216,17 +210,17 @@ class TrainNetwork(CoupledDEVS):
         for i in range(num_of_tracks):
             self.segments.append(self.addSubModel(RailwaySegment("Railway", v_max, length)))
 
-        self.collector =  self.addSubModel(Collector())
+        self.collector = self.addSubModel(Collector("Collector"))
 
         self.connectPorts(self.generator.query_send, self.segments[0].query_recv)
-        self.connectPorts(self.generator.query_rack, self.segments[0].query_sack)
+        self.connectPorts(self.segments[0].query_sack, self.generator.query_rack)
         self.connectPorts(self.generator.train_out, self.segments[0].train_in)
 
         for i in range(1, len(self.segments)):
             self.connectPorts(self.segments[i-1].query_send, self.segments[i].query_recv)
-            self.connectPorts(self.segments[i-1].query_rack, self.segments[i].query_sack)
+            self.connectPorts(self.segments[i].query_sack, self.segments[i-1].query_rack)
             self.connectPorts(self.segments[i-1].train_out, self.segments[i].train_in)
 
         self.connectPorts(self.segments[-1].query_send, self.collector.query_recv)
-        self.connectPorts(self.segments[-1].query_rack, self.collector.query_sack)
+        self.connectPorts(self.collector.query_sack, self.segments[-1].query_rack)
         self.connectPorts(self.segments[-1].train_out, self.collector.train_in)
