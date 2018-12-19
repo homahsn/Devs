@@ -124,8 +124,8 @@ class RailwaySegment(AtomicDEVS):
 
     def extTransition(self, inputs):
 
-        train_input = inputs[self.train_in]
-        query_receive_ack = inputs[self.query_rack]
+        train_input = inputs.get(self.train_in)
+        query_receive_ack = inputs.get(self.query_rack)
 
         if self.state == "Idle" and train_input is not None:
             self.train = train_input
