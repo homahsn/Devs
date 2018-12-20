@@ -8,8 +8,8 @@ def terminate_whenStateIsReached(clock, model):
 
 
 total_railway_length = 100
-num_of_segments = 10
-num_of_trains = 10
+num_of_segments = 1
+num_of_trains = 1
 max_velocity = 150
 acceleration = 15
 iat = 10
@@ -18,4 +18,6 @@ trainNetwork = TrainNetwork("TrainNetwork", num_of_trains, max_velocity, num_of_
 sim = Simulator(trainNetwork)
 sim.setTerminationCondition(terminate_whenStateIsReached)
 sim.setClassicDEVS(True)
+sim.setVerbose(None)
+sim.setTerminationTime(20.0)
 sim.simulate()

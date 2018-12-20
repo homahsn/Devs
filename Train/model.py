@@ -46,13 +46,13 @@ class Generator(AtomicDEVS):
         self.time_advance += self.timeAdvance()
 
         if self.state == "Wait":
-            self.state = "SendTrain"
-            return self.state
-        elif self.state == "SendTrain":
             self.state = "Poll"
             return self.state
         elif self.state == "Poll":
             self.state = "SendTrain"
+            return self.state
+        elif self.state == "SendTrain":
+            self.state = "Poll"
             return self.state
         elif self.state == "Allowed":
             self.state = "Wait"
@@ -64,7 +64,7 @@ class Generator(AtomicDEVS):
 
         ext_input = inputs.get(self.query_rack)
 
-        if ext_input == "Green" and self.state == "SendTrain":
+        if ext_input == "Green":
             self.state = "Allowed"
             return self.state
         else:
@@ -76,7 +76,7 @@ class Generator(AtomicDEVS):
             if len(self.trains) == 0:
                 wait = float('inf')
             else:
-                wait = max(0, self.trains[-1].dep_time - self.time_advance)
+                wait = max(0, self.trains[0].dep_time - self.time_advance)
             return wait
         elif self.state == "Allowed":
             return 0
@@ -86,9 +86,9 @@ class Generator(AtomicDEVS):
             return 1
 
     def outputFnc(self):
-        if self.state == "SendTrain":
+        if self.state == "Poll":
             return {self.query_send: "QUERY"}
-        elif self.state == "Poll" or self.state == "Wait":
+        elif self.state == "SendTrain" or self.state == "Wait":
             return {}
         elif self.state == "Allowed":
             return {self.train_out: self.trains.popleft()}
@@ -119,7 +119,7 @@ class RailwaySegment(AtomicDEVS):
         self.time_advance += self.timeAdvance()
 
         if self.state == "Idle":
-            self.state = "TrainIn"
+            self.state = "Idle"
             return self.state
         elif self.state == "TrainIn":
             self.state = "Accelerate"
@@ -145,17 +145,17 @@ class RailwaySegment(AtomicDEVS):
             self.train = inputs.get(self.train_in)
             self.state = "Accelerate"
             return self.state
-        elif query_receive_ack == "Red" and self.state == "Accelerate":
+        elif query_receive_ack == "Red" and (self.state == "Accelerate" or self.state == "NextSegLight"):
             brake = brake_formula(self.train.v, 1, self.train.x_remaining)
             self.train.v = brake[0]
             self.train.x_remaining -= brake[1]
             self.state = "NextSegLight"
             return self.state
-        elif query_receive_ack == "Green" and self.state == "NextSegLight":
+        elif query_receive_ack == "Green" and (self.state == "NextSegLight" or self.state == "Accelerate"):
             self.state = "TrainOut"
             return self.state
-        elif query_receive == "QUERY":
-            if self.state == "Idle":
+        elif self.state == "Idle":
+            if query_receive == "Query":
                 self.state = "TrainIn"
                 return self.state
             else:
@@ -163,6 +163,33 @@ class RailwaySegment(AtomicDEVS):
                 return self.state
         else:
             return self.state
+
+        # if self.state == "Idle":
+        #     if query_receive == "QUERY":
+        #         self.state = "TrainIn"
+        #         self.train = inputs.get(self.train_in)
+        #         return self.state
+        #     else:
+        #         return self.state
+        # # elif self.state == "TrainIn":
+        # #     self.state = "Accelerate"
+        # #     return self.state
+        # elif self.state == "Accelerate" and query_receive_ack == "Green":
+        #     # accelerate = acceleration_formula(self.train.v, self.v_max, self.train.x_remaining, self.train.max_a)
+        #     self.state = "NextSegLight"
+        #     return self.state
+        # elif self.state == "Accelerate" and query_receive_ack == "Red":
+        #     brake = brake_formula(self.train.v, 1, self.train.x_remaining)
+        #     self.train.v = brake[0]
+        #     self.train.x_remaining -= brake[1]
+        #     self.state = "NextSegLight"
+        #     return self.state
+        # else:
+        #     return self.state
+
+
+
+
 
     def timeAdvance(self):
 
