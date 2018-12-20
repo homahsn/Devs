@@ -21,6 +21,7 @@ class Generator(AtomicDEVS):
         AtomicDEVS.__init__(self, name)
 
         self.generated_trains = []
+        self.number_of_trains = number_of_trains
 
         for i in range(number_of_trains):
             max_a = random.randint(1, acceleration)
@@ -45,17 +46,15 @@ class Generator(AtomicDEVS):
         self.time_advance += self.timeAdvance()
 
         if self.state == "Wait":
-            self.state = "RequestAccess"
+            self.state = "Send"
             return self.state
+        elif self.state == "Send":
+            return "RequestAccess"
         elif self.state == "RequestAccess":
+            self.state = "Send"
             return self.state
         elif self.state == "Allowed":
-            self.state = "SendTrain"
-            return self.state
-        elif self.state == "SendTrain":
             self.state = "Wait"
-            return self.state
-        else:
             return self.state
 
     def extTransition(self, inputs):
@@ -69,7 +68,7 @@ class Generator(AtomicDEVS):
 
     def timeAdvance(self):
         if self.state == "RequestAccess":
-            return 0
+            return 1
         elif self.state == "Wait":
             if len(self.generated_trains) > 0:
                 wait = max(0, self.generated_trains[0].dep_time - self.time_advance)
@@ -77,14 +76,16 @@ class Generator(AtomicDEVS):
                 wait = float('inf')
             return wait
         elif self.state == "Allowed":
-            return 1
+            return 0
+        elif self.state == "Send":
+            return 0
 
     def outputFnc(self):
-        if self.state == "SendTrain":
+        if self.state == "Allowed":
             return {self.train_out: self.generated_trains.pop()}
-        elif self.state == "RequestAccess":
+        elif self.state == "Send":
             return {self.query_send: "QUERY"}
-        else:
+        elif self.state == "RequestAccess" or self.state == "Wait":
             return {}
 
 
@@ -111,14 +112,18 @@ class RailwaySegment(AtomicDEVS):
     def intTransition(self):
         self.time_advance += self.timeAdvance()
         if self.state == "Idle":
+            self.state = "Allow"
+            return self.state
+        elif self.state == "Allow":
+            self.state = "Allow"
             return self.state
         elif self.state == "TrainIn":
             self.state = "Accelerate"
             return self.state
         elif self.state == "Accelerate":
-            self.state = "NextSegLight"
+            self.state = "NextSegment"
             return self.state
-        elif self.state == "NextSegLight":
+        elif self.state == "NextSegment":
             self.state = "RequestAccess"
             return self.state
         elif self.state == "RequestAccess":
@@ -126,26 +131,23 @@ class RailwaySegment(AtomicDEVS):
         elif self.state == "ExitSeg":
             self.state = "Idle"
             return self.state
-        else:
-            return self.state
 
     def extTransition(self, inputs):
-        query_recv = inputs.get(self.query_recv)
         query_rack = inputs.get(self.query_rack)
         incoming_train = inputs.get(self.train_in)
 
-        if self.state == "Idle" and query_recv == "QUERY":
-            if incoming_train is not None:
-                self.train = incoming_train
-                self.state = "TrainIn"
-                return self.state
-            else:
-                return self.state
+        if self.state == "Idle":
+            self.state = "Allow"
+            return self.state
+        elif self.state == "Allow" and isinstance(incoming_train, Train):
+            self.train = incoming_train
+            self.state = "TrainIn"
+            return self.state
         elif query_rack == "RED" and self.state == "RequestAccess":
             brake = brake_formula(self.train.v, 1, self.train.x_remaining)
             self.train.v = brake[0]
             self.train.x_remaining -= brake[1]
-            self.state = "NextSegLight"
+            self.state = "NextSegment"
             return self.state
         elif query_rack == "GREEN" and self.state == "RequestAccess":
             self.state = "ExitSeg"
@@ -169,20 +171,22 @@ class RailwaySegment(AtomicDEVS):
             return accel[1]
         elif self.state == "TrainIn":
             return 0
-        elif self.state == "NextSegLight":
+        elif self.state == "NextSegment":
             return 1
+        elif self.state == "Allow":
+            return 0
 
     def outputFnc(self):
-        if self.state == "TrainIn" or self.state == "Accelerate":
+        if self.state == "TrainIn":
             return {self.query_sack: "RED"}
-        elif self.state == "RequestAccess":
-            return {self.query_send: "QUERY"}
         elif self.state == "ExitSeg":
             return {self.query_sack: "GREEN", self.train_out: self.train}
+        elif self.state == "NextSegment":
+            return {self.query_send: "QUERY"}
         elif self.state == "Idle":
             return {self.query_sack: "GREEN"}
-        elif self.state == "NextSegLight":
-            return {self.query_sack: "RED"}
+        elif self.state == "Allow":
+            return {self.query_sack: "GREEN"}
         else:
             return {}
 
@@ -255,12 +259,3 @@ class TrainNetwork(CoupledDEVS):
         self.connectPorts(self.segments[-1].query_send, self.collector.query_recv)
         self.connectPorts(self.collector.query_sack, self.segments[-1].query_rack)
         self.connectPorts(self.segments[-1].train_out, self.collector.train_in)
-
-    def select(self, imm_children):
-        if self.generator in imm_children:
-            if imm_children[0] != self.generator:
-                return imm_children[0]
-            else:
-                return imm_children[1]
-        else:
-            return imm_children[0]
