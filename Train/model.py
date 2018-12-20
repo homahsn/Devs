@@ -30,7 +30,8 @@ class Generator(AtomicDEVS):
                 dep_time = 0
             else:
                 dep_time = self.trains[-1].dep_time + i_a_t
-            self.trains.append(Train(i, max_a, dep_time))
+            train = Train(i, max_a, dep_time)
+            self.trains.append(train)
 
         self.query_send = self.addOutPort("Q_send")
         self.query_rack = self.addInPort("Q_rack")
@@ -45,25 +46,30 @@ class Generator(AtomicDEVS):
         self.time_advance += self.timeAdvance()
 
         if self.state == "Wait":
-            self.state = "Send"
-        elif self.state == "Send":
+            self.state = "SendTrain"
+            return self.state
+        elif self.state == "SendTrain":
             self.state = "Poll"
+            return self.state
         elif self.state == "Poll":
-            self.state = "Send"
+            self.state = "SendTrain"
+            return self.state
         elif self.state == "Allowed":
             self.state = "Wait"
-
-        return self.state
+            return self.state
+        else:
+            return self.state
 
     def extTransition(self, inputs):
-        ext_input = inputs[self.query_rack]
 
-        if ext_input == "Green":
+        ext_input = inputs.get(self.query_rack)
+
+        if ext_input == "Green" and self.state == "SendTrain":
             self.state = "Allowed"
+            return self.state
         else:
             self.state = self.state
-
-        return self.state
+            return self.state
 
     def timeAdvance(self):
         if self.state == "Wait":
@@ -74,21 +80,18 @@ class Generator(AtomicDEVS):
             return wait
         elif self.state == "Allowed":
             return 0
-        elif self.state == "Send":
+        elif self.state == "SendTrain":
             return 0
         elif self.state == "Poll":
             return 1
 
     def outputFnc(self):
-        if self.state == "Send":
+        if self.state == "SendTrain":
             return {self.query_send: "QUERY"}
         elif self.state == "Poll" or self.state == "Wait":
             return {}
         elif self.state == "Allowed":
             return {self.train_out: self.trains.popleft()}
-
-    def set(self, state):
-        self.state = state
 
 
 class RailwaySegment(AtomicDEVS):
@@ -104,6 +107,8 @@ class RailwaySegment(AtomicDEVS):
         self.train_in = self.addInPort("train_in")
         self.train_out = self.addOutPort("train_out")
 
+        self.time_advance = 0
+
         self.state = "Idle"
         self.length = length
         self.train = None
@@ -111,51 +116,81 @@ class RailwaySegment(AtomicDEVS):
 
     def intTransition(self):
 
+        self.time_advance += self.timeAdvance()
+
         if self.state == "Idle":
             self.state = "TrainIn"
+            return self.state
         elif self.state == "TrainIn":
             self.state = "Accelerate"
+            return self.state
         elif self.state == "Accelerate":
             self.state = "NextSegLight"
-        elif self.state == "Accelerate":
+            return self.state
+        elif self.state == "NextSegLight":
+            self.state = "TrainOut"
+            return self.state
+        elif self.state == "TrainOut":
             self.state = "Idle"
-
-        return self.state
+            return self.state
+        else:
+            return self.state
 
     def extTransition(self, inputs):
 
-        train_input = inputs.get(self.train_in)
         query_receive_ack = inputs.get(self.query_rack)
+        query_receive = inputs.get(self.query_recv)
 
-        if self.state == "Idle" and train_input is not None:
-            self.train = train_input
-            self.state = "TrainIn"
+        if self.state == "TrainIn":
+            self.train = inputs.get(self.train_in)
+            self.state = "Accelerate"
+            return self.state
         elif query_receive_ack == "Red" and self.state == "Accelerate":
             brake = brake_formula(self.train.v, 1, self.train.x_remaining)
             self.train.v = brake[0]
             self.train.x_remaining -= brake[1]
             self.state = "NextSegLight"
+            return self.state
         elif query_receive_ack == "Green" and self.state == "NextSegLight":
-            self.state = "Accelerate"
-
-        return self.state
+            self.state = "TrainOut"
+            return self.state
+        elif query_receive == "QUERY":
+            if self.state == "Idle":
+                self.state = "TrainIn"
+                return self.state
+            else:
+                self.state = self.state
+                return self.state
+        else:
+            return self.state
 
     def timeAdvance(self):
 
         if self.state == "Idle":
             return float('inf')
         elif self.state == "Accelerate":
-            velocity_time = acceleration_formula(self.train.v, 100, self.train.x_remaining, self.train.max_a)
+            velocity_time = acceleration_formula(self.train.v, self.v_max, self.train.x_remaining, self.train.max_a)
+            self.train.v = velocity_time[0]
+            return velocity_time[1]
+        elif self.state == "TrainOut":
+            velocity_time = acceleration_formula(self.train.v, self.v_max, self.train.x_remaining, self.train.max_a)
             self.train.v = velocity_time[0]
             return velocity_time[1]
         elif self.state == "NextSegLight":
             return 1
+        elif self.state == "TrainIn":
+            return 0
+        elif self.state == "TrainOut":
+            return 0
+
 
     def outputFnc(self):
-        if self.train is not None and self.state != "Idle":
+        if self.state != "Idle":
             return {self.query_sack: "Red"}
-        else:
+        elif self.state == "TrainOut":
             return {self.train_out: self.train}
+        else:
+            return {self.query_sack: "Green"}
 
 
 class Collector(AtomicDEVS):
@@ -171,24 +206,28 @@ class Collector(AtomicDEVS):
         self.state = "Empty"
 
     def intTransition(self):
+
+        self.time_advance += self.timeAdvance()
+
         if self.state == "Empty":
             self.state = "TrainIn"
+            return self.state
         elif self.state == "TrainIn":
             self.state = "Empty"
-
-        return self.state
+            return self.state
+        else:
+            return self.state
 
     def extTransition(self, inputs):
-        self.time_advance += self.elapsed
-        train_input = inputs[self.train_in]
-        query_input = inputs[self.query_recv]
+        # self.time_advance += self.elapsed
+
+        train_input = inputs.get(self.train_in)
+        query_input = inputs.get(self.query_recv)
         # query_input = inputs[self.query_recv]
 
         if train_input is not None and isinstance(train_input, Train):
             self.state = "TrainIn"
             self.trains.append(train_input)
-        elif query_input is not None:
-            self.state = "TrainIn"
         else:
             self.state = self.state
 
@@ -234,10 +273,4 @@ class TrainNetwork(CoupledDEVS):
         self.connectPorts(self.segments[-1].train_out, self.collector.train_in)
 
     def select(self, imm_children):
-        if self.generator in imm_children:
-            if imm_children[0] != self.generator:
-                return imm_children[0]
-            else:
-                return imm_children[1]
-        else:
-            return imm_children[0]
+        return imm_children[0]

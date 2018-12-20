@@ -4,12 +4,12 @@ from model import TrainNetwork
 
 
 def terminate_whenStateIsReached(clock, model):
-    return len(model.collector.trains) == len(model.generator.trains)
+    return len(model.collector.trains) == 10
 
 
-total_railway_length = 15000
+total_railway_length = 100
 num_of_segments = 10
-num_of_trains = 100
+num_of_trains = 10
 max_velocity = 150
 acceleration = 15
 iat = 10
@@ -17,5 +17,5 @@ trainNetwork = TrainNetwork("TrainNetwork", num_of_trains, max_velocity, num_of_
                             total_railway_length, acceleration, iat)
 sim = Simulator(trainNetwork)
 sim.setTerminationCondition(terminate_whenStateIsReached)
-sim.setClassicDEVS()
+sim.setClassicDEVS(True)
 sim.simulate()
